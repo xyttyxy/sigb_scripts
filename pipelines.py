@@ -1,45 +1,62 @@
 from ase.io import read, write
 from ase.calculators.vasp import Vasp 
 import shutil
-from copy import deepcopy as dcopy
+import os
 
 
-base_calc = Vasp(gga = 'PE',  # Change this according to the functional used
-                 lreal='Auto',
-                 lplane = True,
-                 lwave = False,
-                 lcharg = False, 
-                 npar = 4, 
-                 prec = 'Normal',
-                 encut = 400, 
-                 ediff = 1e-6, 
-                 algo = 'VeryFast', 
-                 ismear = -5, 
-                 gamma = True,
-                 command = 'mpirun -np ${NSLOTS} ${VASP_COMMAND}')
-
-
-def geo_opt(atoms):
-    write('CONTCAR', atoms)
-    calc = dcopy(base_calc)
-    calc.ibrion = 2
-    calc.ediffg = -1e-2
-    calc.nsw = 200
+def get_base_calc():
+    base_calc = Vasp(gga = 'PE',  # Change this according to the functional used
+                     lreal='Auto',
+                     lplane = True,
+                     lwave = False,
+                     lcharg = False, 
+                     npar = 4, 
+                     prec = 'Normal',
+                     encut = 400, 
+                     ediff = 1e-6, 
+                     algo = 'VeryFast', 
+                     ismear = -5, 
+                     gamma = True,
+                     command = os.getenv('VASP_COMMAND'))
     
+    return base_calc
+
+
+def geo_opt(atoms, mode = 'vasp'):
+    write('CONTCAR', atoms)
+    calc = get_base_calc()
+    calc.set(ibrion = 2,
+             ediffg = -1e-2,
+             nsw = 200,
+             nelm = 200)
+
     # add other settings as needed
-    opt_levels = {'kpts': [[3, 3, 3], [5, 5, 5], [7, 7, 7]]} 
-    for level in [1, 2, 3]:
-        calc.kpts = opt_levels['kpts'][level]
+    opt_levels = {'kpts': {1: [3, 3, 3],
+                           2: [5, 5, 5],
+                           3: [7, 7, 7]}} 
+    for level in [1, 2, 3]: 
+        calc.set(kpts = opt_levels['kpts'][level])
         atoms_tmp = read('CONTCAR')
         atoms_tmp.calc = calc
         atoms_tmp.get_potential_energy()
+        calc.reset()
         atoms_tmp = read('OUTCAR', index=-1)
-        shutil.copyfile('CONTCAR', f'CONTCAR.opt{level}.vasp')
+        shutil.copyfile('CONTCAR', f'opt{level}.vasp')
         shutil.copyfile('vasprun.xml', f'opt{level}.xml')
         shutil.copyfile('OUTCAR', f'opt{level}.OUTCAR')
 
     return atoms_tmp
 
+
+def freq(atoms, mode = 'vasp'):
+    calc = get_base_calc()
+    calc.set(ibrion = 5,
+             potim = 0.015,
+             nsw = 500, # as many dofs as needed
+             kpts = [1, 7, 5]) # todo: kpts depends strongly on the structure, and should be supplied in atoms 
+    atoms.calc = calc
+    atoms.get_potential_energy()
+    # todo: parse OUTCAR frequencies and modes
 
 def bader(atoms):
     import os
@@ -47,12 +64,12 @@ def bader(atoms):
     import pandas as pd
     import numpy as np
     
-    calc = dcopy(base_calc)
-    calc.ibrion = -1
-    calc.nsw = 0
-    calc.lorbit = 12
-    calc.laechg = True
-    calc.lcharg = True
+    calc = get_base_calc()
+    calc.set(ibrion = -1,
+             nsw = 0,
+             lorbit = 12,
+             lcharg = True,
+             laechg = True)
     
     atoms.calc = calc
     atoms.get_potential_energy()
@@ -79,18 +96,18 @@ def bader(atoms):
 
 
 def cohp(atoms, bonds, lobsterin_template = None):
-    import os
-    calc = dcopy(base_calc)
-    calc.ibrion = -1
-    calc.nsw = 0
+    calc = get_base_calc()
+    calc.set(ibrion = -1,
+             nsw = 0,
+             isym = -1)
 
     n_si = len([a for a in atoms if a.symbol == 'Si'])
     n_o = len([a for a in atoms if a.symbol == 'O'])
     n_al = len([a for a in atoms if a.symbol == 'Al'])
 
     nelect = n_si*4 + n_o*6+n_al*3
-    calc.nbands = nelect + 20 # giving 20 empty bands. may require more
-    calc.isym = -1 # turning off symmetry
+    calc.set(nbands = nelect + 20) # giving 20 empty bands. may require more
+
     
     atoms.calc = calc
     atoms.get_potential_energy()

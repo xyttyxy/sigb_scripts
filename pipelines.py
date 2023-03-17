@@ -2,6 +2,9 @@ from ase.io import read, write
 from ase.calculators.vasp import Vasp 
 import shutil
 import os
+import subprocess
+import pandas as pd
+import numpy as np
 
 
 def get_base_calc():
@@ -59,10 +62,6 @@ def freq(atoms, mode = 'vasp'):
     # todo: parse OUTCAR frequencies and modes
 
 def bader(atoms):
-    import os
-    import subprocess
-    import pandas as pd
-    import numpy as np
     
     calc = get_base_calc()
     calc.set(ibrion = -1,

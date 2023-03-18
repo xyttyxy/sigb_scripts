@@ -1,10 +1,9 @@
+#!/usr/bin/env python
+
 from ase.io import read, write
 from ase.calculators.vasp import Vasp 
 import shutil
 import os
-import subprocess
-import pandas as pd
-import numpy as np
 
 
 def get_base_calc():
@@ -53,22 +52,54 @@ def geo_opt(atoms, mode = 'vasp'):
 
 def freq(atoms, mode = 'vasp'):
     calc = get_base_calc()
+    if 'kpts' in atoms.info.keys():
+        kpts = atoms.info['kpts']
+    else:
+        kpts = [1, 7, 5]
     calc.set(ibrion = 5,
              potim = 0.015,
              nsw = 500, # as many dofs as needed
-             kpts = [1, 7, 5]) # todo: kpts depends strongly on the structure, and should be supplied in atoms 
+             kpts = kpts) 
     atoms.calc = calc
     atoms.get_potential_energy()
     # todo: parse OUTCAR frequencies and modes
+    
+
+def read_bader(atoms):
+    import pandas as pd
+    import numpy as np
+    
+    latoms = len(atoms)
+    df = pd.read_table('ACF.dat', delim_whitespace=True, header=0, skiprows=[1, latoms+2, latoms+3, latoms+4, latoms+5])
+    charges = df['CHARGE'].to_numpy()
+    n_si = len([a for a in atoms if a.symbol == 'Si'])
+    n_o = len([a for a in atoms if a.symbol == 'O'])
+    n_al = len([a for a in atoms if a.symbol == 'Al'])
+
+    ocharges = np.array([4]*n_si+[3]*n_al+[6]*n_o)
+    dcharges = -charges + ocharges
+    atoms.set_initial_charges(np.round(dcharges, 2))
+    
+    return atoms
+    
 
 def bader(atoms):
-    
+    import os
+    import subprocess
+
     calc = get_base_calc()
+    
+    if 'kpts' in atoms.info.keys():
+        kpts = atoms.info['kpts']
+    else:
+        kpts = [1, 7, 5]
+        
     calc.set(ibrion = -1,
              nsw = 0,
              lorbit = 12,
              lcharg = True,
-             laechg = True)
+             laechg = True,
+             kpts = kpts)
     
     atoms.calc = calc
     atoms.get_potential_energy()
@@ -81,17 +112,10 @@ def bader(atoms):
     bader = os.getenv('VTST_BADER')
     proc = subprocess.run([bader], capture_output=True)
     
-    df = pd.read_table('ACF.dat', delim_whitespace=True, header=0, comment = '-')
-    charges = df['CHARGE'][1:-4].to_numpy()
-    n_si = len([a for a in atoms if a.symbol == 'Si'])
-    n_o = len([a for a in atoms if a.symbol == 'O'])
-    n_al = len([a for a in atoms if a.symbol == 'Al'])
+    assert os.path.exists('ACF.dat'), 'bader: ACF.dat not found'
+    atoms_with_charge = read_bader(atoms)
     
-    ocharges = np.array([4]*n_si+[3]*n_al+[6]*n_o)
-    dcharges = -charges + ocharges
-    atoms.set_initial_charges(np.round(dcharges, 2))
-    
-    return atoms
+    return atoms_with_charge
 
 
 def cohp(atoms, bonds, lobsterin_template = None):
@@ -106,7 +130,6 @@ def cohp(atoms, bonds, lobsterin_template = None):
 
     nelect = n_si*4 + n_o*6+n_al*3
     calc.set(nbands = nelect + 20) # giving 20 empty bands. may require more
-
     
     atoms.calc = calc
     atoms.get_potential_energy()
@@ -126,6 +149,8 @@ def cohp(atoms, bonds, lobsterin_template = None):
 
     
 if __name__ == '__main__':
-    before = read('before.vasp')
-    opted = geo_opt(before)
-    write('opted.traj', opted)
+    from ase.visualize import view
+
+    # for testing
+    atoms = read_bader(read('POSCAR'))
+    view(atoms)

@@ -22,20 +22,27 @@ def get_base_calc():
     return base_calc
 
 
-def geo_opt(atoms, mode = 'vasp'):
+def geo_opt(atoms, mode = 'vasp', opt_levels = None):
     write('CONTCAR', atoms)
     calc = get_base_calc()
     calc.set(ibrion = 2,
              ediffg = -1e-2,
              nsw = 200,
              nelm = 200)
-
-    # add other settings as needed
-    opt_levels = {'kpts': {1: [3, 3, 3],
-                           2: [5, 5, 5],
-                           3: [7, 7, 7]}} 
-    for level in [1, 2, 3]: 
-        calc.set(kpts = opt_levels['kpts'][level])
+    
+    if not opt_levels:
+        # for bulks.
+        # other systems: pass in argument
+        opt_levels = {1: {'kpts': [3, 3, 3]},
+                      2: {'kpts': [5, 5, 5]},
+                      3: {'kpts': [7, 7, 7]}}
+        
+    levels = opt_levels.keys()
+    for level in levels:
+        level_settings = opt_levels[level]
+        # todo: check for other settings passed in
+        # todo: handle case when kpts not used
+        calc.set(kpts = level_settings['kpts'])
         atoms_tmp = read('CONTCAR')
         atoms_tmp.calc = calc
         atoms_tmp.get_potential_energy()

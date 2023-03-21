@@ -224,7 +224,8 @@ class COHP:
             
         self.lobsterin_template =  template
             
-    def run_vasp(self, atoms):
+    def run_vasp(self):
+        atoms = self.atoms
         calc = get_base_calc()
         calc.set(ibrion = -1,
                  nsw = 0,

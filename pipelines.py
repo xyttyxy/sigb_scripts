@@ -5,7 +5,7 @@ from ase.io import read, write
 from ase.calculators.vasp import Vasp 
 import shutil
 import os
-
+import numpy as np
 
 def get_base_calc():
     base_calc = Vasp(gga = 'PE',  # Change this according to the functional used
@@ -18,7 +18,7 @@ def get_base_calc():
                      encut = 400, 
                      ediff = 1e-6, 
                      algo = 'VeryFast', 
-                     ismear = -5, 
+                     ismear = -5, # warning: need to change if molecule/metal
                      gamma = True,
                      command = os.getenv('VASP_COMMAND'))
     
@@ -41,6 +41,10 @@ def cell_opt(atoms, npoints = 5, eps = 0.04):
     
     v, e, B = eos.fit()
     eos.plot(filename='eos.png')
+    opt_factor = v / atoms.get_volume()
+    atoms.cell = atoms.cell * opt_factor
+    write('opted_cell.vasp', atoms)
+    return atoms
 
 
 def axis_opt(atoms, axis, npoints=5, eps=0.04):
@@ -63,16 +67,14 @@ def axis_opt(atoms, axis, npoints=5, eps=0.04):
                  directory = f'{factor:.2f}')
         atoms_tmp.calc = calc
         ens[ifactor] = atoms_tmp.get_potential_energy()
-        vols[ifactor] = atoms.get_volume()
+        vols[ifactor] = atoms_tmp.get_volume()
         
     from ase.eos import EquationOfState as EOS
-    
     eos = EOS(volumes=vols, energies=ens, eos='sj')
     v0, e0, B = eos.fit()
     opt_factor = v0 / atoms.get_volume()
     atoms.cell[axis] = atoms.cell[axis] * opt_factor
-    
-    # directly return optimized atoms object
+    write('opted_axis.vasp', atoms)
     return atoms
 
 
@@ -119,16 +121,24 @@ def freq(atoms, mode = 'vasp'):
     calc.set(kpts = kpts)
     
     if mode == 'vasp':
+        # avoid this on large structures
+        # ncore/npar unusable, leads to kpoint errors
+        # isym must be switched off, leading to large memory usage
         calc.set(ibrion = 5,
                  potim = 0.015,
-                 nsw = 500) # as many dofs as needed
+                 nsw = 500, # as many dofs as needed
+                 ncore = None, # avoids error of 'changing kpoints'
+                 npar = None, 
+                 isym = 0) # turn off symmetry
 
         atoms.calc = calc
         atoms.get_potential_energy()
         # todo: parse OUTCAR frequencies and modes
     elif mode == 'ase':
+        # this should be used. 
         from ase.vibrations import Vibrations
-        calc.set(lwave=True)
+        calc.set(lwave = True,
+                 isym = -1) # according to michael
         atoms.calc = calc
         constr = atoms.constraints
         constr = [c for c in constr if isinstance(c, FixAtoms)]
@@ -176,7 +186,6 @@ def bader(atoms):
     
     def read_bader(atoms):
         import pandas as pd
-        import numpy as np
 
         latoms = len(atoms)
         df = pd.read_table('ACF.dat', delim_whitespace=True, header=0, skiprows=[1, latoms+2, latoms+3, latoms+4, latoms+5])
@@ -262,8 +271,6 @@ class COHP:
             raw = [[eval(i) for i in l.split()] for l in raw]
             return np.array(raw)
 
-
-        import numpy as np
         import matplotlib.pyplot as plt
 
         data_cohp = read_COHP('./COHPCAR.lobster')
@@ -457,7 +464,6 @@ class NEB:
         
         runs = min(runs)
         nimages = len(self.images)
-        import numpy as np
         energies = np.zeros((runs, nimages))
         for iimage in range(1, len(self.images)-1):
             run = 0

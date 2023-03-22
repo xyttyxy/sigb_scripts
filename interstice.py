@@ -10,16 +10,16 @@ import sys
 
 
 def calc_o_position(atoms, chosen_pos, neigh_pos):
-    """ gives a position of oxygen between 2 Si
+    """gives a position of oxygen between 2 Si
 
     This is not PBC aware! Take care of PBC outside.
     O site on the bisecting plane of the bond with random polar angle.
     """
     # normal vector
-    p = neigh_pos - chosen_pos # (a,b,c)
+    p = neigh_pos - chosen_pos  # (a,b,c)
     # vectors in plane
-    u = np.array([p[1], -p[0], 0]) # can check: normal to p
-    v = np.cross(p, u) # normal to p and u; u, v is basis
+    u = np.array([p[1], -p[0], 0])  # can check: normal to p
+    v = np.cross(p, u)  # normal to p and u; u, v is basis
 
     u /= np.linalg.norm(u)
     v /= np.linalg.norm(v)
@@ -27,7 +27,7 @@ def calc_o_position(atoms, chosen_pos, neigh_pos):
     twopi = np.pi * 2
     theta = random.random() * twopi
     d = 0.7860
-    site = chosen_pos + p / 2 + (np.cos(theta)*u + np.sin(theta)*v) * d
+    site = chosen_pos + p / 2 + (np.cos(theta) * u + np.sin(theta) * v) * d
 
     return site
 
@@ -40,21 +40,20 @@ def nudge_si_position(atoms, ichosen, chosen_pos, ineigh, neigh_pos):
 
         vnudge = pos_nudge - pos_O
         vnudge /= np.linalg.norm(vnudge)
-        dnudge = 1.635-1.495 # amount to change Si-O bond length by
+        dnudge = 1.635 - 1.495  # amount to change Si-O bond length by
 
         atoms.positions[inudge] += vnudge * dnudge
 
 
 def get_sites(atoms):
-    """Add one oxygen to the interstitial site between each Si-Si bond
-    """
+    """Add one oxygen to the interstitial site between each Si-Si bond"""
     rcut = 2.5
-    cutoffs = [rcut/2] * len(atoms)
-    atoms_Si = Atoms([at for at in atoms if at.symbol == 'Si'],
-                     cell=atoms.cell,
-                     pbc=True)
+    cutoffs = [rcut / 2] * len(atoms)
+    atoms_Si = Atoms(
+        [at for at in atoms if at.symbol == "Si"], cell=atoms.cell, pbc=True
+    )
 
-    nl = NeighborList(cutoffs, self_interaction=False, bothways = True)
+    nl = NeighborList(cutoffs, self_interaction=False, bothways=True)
 
     nl.update(atoms_Si)
 
@@ -66,28 +65,34 @@ def get_sites(atoms):
         indices, offsets = nl.get_neighbors(chosen)
         for ineigh, offset in zip(indices, offsets):
             key = str(sorted([chosen, ineigh]))
-            if key in dict_offset.keys() and np.all(np.equal(offset, np.array([0, 0, 0]))):
-                print(f'key {key:s} already seen')
+            if key in dict_offset.keys() and np.all(
+                np.equal(offset, np.array([0, 0, 0]))
+            ):
+                print(f"key {key:s} already seen")
                 # already seen this before and both in original image
                 continue
             else:
                 dict_offset[key] = offset
 
-            neigh_pos = atoms.positions[ineigh] + np.dot(offset, atoms.get_cell())
+            neigh_pos = atoms.positions[ineigh] + np.dot(
+                offset, atoms.get_cell()
+            )
             site = calc_o_position(atoms, at.position, neigh_pos)
-            atoms_tmp = atoms.copy() + Atoms('O', positions=[site])
+            atoms_tmp = atoms.copy() + Atoms("O", positions=[site])
 
-            nudge_si_position(atoms_tmp, chosen, at.position, ineigh, neigh_pos)
+            nudge_si_position(
+                atoms_tmp, chosen, at.position, ineigh, neigh_pos
+            )
             atoms_ret.append(atoms_tmp)
 
     return atoms_ret
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) == 2:
         fname = sys.argv[1]
     else:
-        fname = './bulk_2x2x2.vasp'
+        fname = "./bulk_2x2x2.vasp"
     conventional = read(fname)
     random.seed(1)
     from ase.visualize import view

@@ -544,5 +544,6 @@ class Dimer:
 
 
 if __name__ == "__main__":
+    pass
     # for testing, remove before committing
     # do not pollute diffs by commiting

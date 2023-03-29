@@ -78,11 +78,16 @@ def get_sites(atoms):
                 offset, atoms.get_cell()
             )
             site = calc_o_position(atoms, at.position, neigh_pos)
-            atoms_tmp = atoms.copy() + Atoms("O", positions=[site])
-
-            nudge_si_position(
-                atoms_tmp, chosen, at.position, ineigh, neigh_pos
-            )
+            atoms_tmp = atoms.copy()#  + Atoms("O", positions=[site])
+            atoms_tmp.info['O_site'] = site
+            atoms_tmp.info['chosen'] = chosen
+            atoms_tmp.info['chosen_pos'] = chosen_pos
+            atoms_tmp.info['ineigh'] = ineigh
+            atoms_tmp.info['neigh_pos'] = neigh_pos
+            
+            # nudge_si_position(
+            #     atoms_tmp, chosen, at.position, ineigh, neigh_pos
+            # )
             atoms_ret.append(atoms_tmp)
 
     return atoms_ret

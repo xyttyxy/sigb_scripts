@@ -48,11 +48,11 @@ def nudge_si_position(atoms, ichosen, chosen_pos, ineigh, neigh_pos):
 def get_sites(atoms):
     """Add one oxygen to the interstitial site between each Si-Si bond"""
     rcut = 2.5
-    cutoffs = [rcut / 2] * len(atoms)
+
     atoms_Si = Atoms(
         [at for at in atoms if at.symbol == "Si"], cell=atoms.cell, pbc=True
     )
-
+    cutoffs = [rcut / 2] * len(atoms_Si)
     nl = NeighborList(cutoffs, self_interaction=False, bothways=True)
 
     nl.update(atoms_Si)
@@ -60,7 +60,7 @@ def get_sites(atoms):
     # matrix = nl.get_connectivity_matrix(sparse=False)
     atoms_ret = []
     dict_offset = {}
-    for at in atoms:
+    for at in atoms_Si:
         chosen = at.index
         indices, offsets = nl.get_neighbors(chosen)
         for ineigh, offset in zip(indices, offsets):
@@ -81,7 +81,7 @@ def get_sites(atoms):
             atoms_tmp = atoms.copy()#  + Atoms("O", positions=[site])
             atoms_tmp.info['O_site'] = site
             atoms_tmp.info['chosen'] = chosen
-            atoms_tmp.info['chosen_pos'] = chosen_pos
+            atoms_tmp.info['chosen_pos'] = at.position
             atoms_tmp.info['ineigh'] = ineigh
             atoms_tmp.info['neigh_pos'] = neigh_pos
             

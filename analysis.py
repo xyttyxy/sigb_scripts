@@ -164,7 +164,7 @@ class calc_series:
             parameters = self.calcs.keys()
         ret_str = [f"{wrt_param:20s}{prop:>10s}\n"]
         for prop, param in zip(properties, parameters):
-            ret_str.append(f"{param:20s}{prop:>10.2f}\n")
+            ret_str.append(f"{param:20s}{prop:>10.8f}\n")
         return ''.join(ret_str)
 
     def check_conv(self, prop="en_interface", wrt_param="name"):

@@ -3,12 +3,45 @@
 
 from ase.io import read, write
 from ase.calculators.vasp import Vasp
+
 import shutil
 import os
 import subprocess
 import numpy as np
 
 
+def set_vasp_key(calc, key, value):
+    from ase.calculators.vasp.create_input import float_keys, exp_keys, string_keys, int_keys, bool_keys, list_int_keys, list_bool_keys, list_float_keys, special_keys, dict_keys
+
+    if key in float_keys:
+        calc.float_params[key] = value
+    elif key in exp_keys:
+        calc.exp_params[key] = value
+    elif key in string_keys:
+        calc.string_params[key] = value
+    elif key in int_keys:
+        calc.int_params[key] = value
+    elif key in bool_keys:
+        calc.bool_params[key] = value
+    elif key in list_int_keys:
+        calc.list_int_params[key] = value
+    elif key in list_bool_keys:
+        calc.list_bool_params[key] = value
+    elif key in list_float_keys:
+        calc.list_float_params[key] = value
+    elif key in list_float_keys:
+        calc.list_float_params[key] = value
+    elif key in special_keys:
+        calc.special_params[key] = value
+    elif key in dict_keys:
+        calc.dict_params[key] = value
+        
+    # some keys need special treatment
+    # including kpts, gamma, xc
+    if key in calc.input_params.keys():
+        calc.input_params[key] = value
+        
+    
 def get_base_calc():
     base_calc = Vasp(
         gga="PE",  # Change this according to the functional used
@@ -75,11 +108,9 @@ def axis_opt(atoms, axis, npoints=5, eps=0.04):
     return atoms
 
 
-def geo_opt(atoms, mode="vasp", opt_levels=None):
+def geo_opt(atoms, mode="vasp", opt_levels=None, fmax=0.02):
     write("CONTCAR", atoms)
     calc = get_base_calc()
-    calc.set(ibrion=2, ediffg=-1e-2, nsw=200, nelm=200)
-
     if not opt_levels:
         # for bulks.
         # other systems: pass in argument
@@ -90,22 +121,51 @@ def geo_opt(atoms, mode="vasp", opt_levels=None):
         }
 
     levels = opt_levels.keys()
-    for level in levels:
-        level_settings = opt_levels[level]
-        # todo: check for other settings passed in
-        # todo: handle case when kpts not used
-        for key in level_settings.keys():
-            setattr(calc, key, level_settings[key])
-        
-        atoms_tmp = read("CONTCAR")
-        atoms_tmp.calc = calc
-        atoms_tmp.get_potential_energy()
-        calc.reset()
-        atoms_tmp = read("OUTCAR", index=-1)
-        shutil.copyfile("CONTCAR", f"opt{level}.vasp")
-        shutil.copyfile("vasprun.xml", f"opt{level}.xml")
-        shutil.copyfile("OUTCAR", f"opt{level}.OUTCAR")
+    if mode == 'vasp':
+        for level in levels:
+            level_settings = opt_levels[level]
+            # default settings when using built-in optimizer
+            set_vasp_key(calc, 'ibrion', 2)
+            set_vasp_key(calc, 'ediffg', -1e-2)
+            set_vasp_key(calc, 'nsw', 200)
+            set_vasp_key(calc, 'nelm', 200)
+            # user-supplied overrides
+            for key in level_settings.keys():
+                set_vasp_key(calc, key, level_settings[key])
 
+            atoms_tmp = read("CONTCAR")
+            atoms_tmp.calc = calc
+            atoms_tmp.get_potential_energy()
+            calc.reset()
+            atoms_tmp = read("OUTCAR", index=-1)
+            shutil.copyfile("CONTCAR", f"opt{level}.vasp")
+            shutil.copyfile("vasprun.xml", f"opt{level}.xml")
+            shutil.copyfile("OUTCAR", f"opt{level}.OUTCAR")
+    elif mode == 'ase':
+        from ase.optimize import BFGS
+        # this atoms_tmp is updated when optimizer runs
+        atoms_tmp = read("CONTCAR")
+        
+        for level in levels:
+            # default settings when using ase optimizer
+            set_vasp_key(calc, 'ibrion', -1)
+            set_vasp_key(calc, 'nsw', 0)
+            # user-supplied overrides
+            level_settings = opt_levels[level]
+            for key in level_settings.keys():
+                if key in ['nsw', 'ibrion', 'ediffg']:
+                    continue
+                set_vasp_key(calc, key, level_settings[key])
+
+            atoms_tmp.calc = calc
+            opt = BFGS(atoms_tmp,
+                       trajectory = f"opt{level}.traj",
+                       logfile = f"opt{level}.log")
+            opt.run(fmax=fmax)
+            calc.reset()
+            shutil.copyfile("vasprun.xml", f"opt{level}.xml")
+            shutil.copyfile("OUTCAR", f"opt{level}.OUTCAR")
+            
     return atoms_tmp
 
 

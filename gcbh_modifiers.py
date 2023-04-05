@@ -199,7 +199,9 @@ if __name__ == "__main__":
         atoms_in.rotate(90, 'z', rotate_cell=True)
         tx = np.linalg.norm(cell[2])
         tz = np.linalg.norm(cell[0])
-        atoms_in.translate([tx,0,tz])
+        # atoms_in.translate([tx,0,tz])
+        # print([tx,0,tz])
+        # view(atoms_in)
         ase.io.write("1Al4O1_rotated.poscar", atoms_in)
         
     n_attempts = 100

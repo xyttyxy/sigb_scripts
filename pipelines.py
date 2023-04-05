@@ -94,7 +94,9 @@ def geo_opt(atoms, mode="vasp", opt_levels=None):
         level_settings = opt_levels[level]
         # todo: check for other settings passed in
         # todo: handle case when kpts not used
-        calc.set(kpts=level_settings["kpts"])
+        for key in level_settings.keys():
+            setattr(calc, key, level_settings[key])
+        
         atoms_tmp = read("CONTCAR")
         atoms_tmp.calc = calc
         atoms_tmp.get_potential_energy()

@@ -109,7 +109,6 @@ def axis_opt(atoms, axis, npoints=5, eps=0.04):
 
 
 def geo_opt(atoms, mode="vasp", opt_levels=None, fmax=0.02):
-    write("CONTCAR", atoms)
     calc = get_base_calc()
     if not opt_levels:
         # for bulks.
@@ -122,6 +121,7 @@ def geo_opt(atoms, mode="vasp", opt_levels=None, fmax=0.02):
 
     levels = opt_levels.keys()
     if mode == 'vasp':
+        write("CONTCAR", atoms)
         for level in levels:
             level_settings = opt_levels[level]
             # default settings when using built-in optimizer
@@ -142,10 +142,9 @@ def geo_opt(atoms, mode="vasp", opt_levels=None, fmax=0.02):
             shutil.copyfile("vasprun.xml", f"opt{level}.xml")
             shutil.copyfile("OUTCAR", f"opt{level}.OUTCAR")
     elif mode == 'ase':
+        atoms_tmp = atoms.copy()
         from ase.optimize import BFGS
         # this atoms_tmp is updated when optimizer runs
-        atoms_tmp = read("CONTCAR")
-        
         for level in levels:
             # default settings when using ase optimizer
             set_vasp_key(calc, 'ibrion', -1)

@@ -149,6 +149,9 @@ def geo_opt(atoms, mode="vasp", opt_levels=None, fmax=0.02):
             # default settings when using ase optimizer
             set_vasp_key(calc, 'ibrion', -1)
             set_vasp_key(calc, 'nsw', 0)
+            # allow reading WAVECAR if one is present
+            set_vasp_key(calc, 'lwave', True)
+            set_vasp_key(calc, 'istart', None)
             # user-supplied overrides
             level_settings = opt_levels[level]
             for key in level_settings.keys():
@@ -164,7 +167,11 @@ def geo_opt(atoms, mode="vasp", opt_levels=None, fmax=0.02):
             calc.reset()
             shutil.copyfile("vasprun.xml", f"opt{level}.xml")
             shutil.copyfile("OUTCAR", f"opt{level}.OUTCAR")
-            
+
+        # ase optimizer does not write energy/forces to
+        # the attached object
+        atoms_tmp = read(f'opt{levle}.traj', index=-1)
+        
     return atoms_tmp
 
 

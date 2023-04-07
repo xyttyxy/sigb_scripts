@@ -642,7 +642,6 @@ class gb_sliding:
             return atoms
         else:
             self.slide(atoms, disp)
-
     def analysis(self):
         E = np.array([])
         for i in range(80):

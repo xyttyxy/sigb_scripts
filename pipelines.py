@@ -602,7 +602,54 @@ class Dimer:
 
     def run(self):
         self.atoms.get_potential_energy()
-
+        
+class gb_sliding:
+    def distance(self, atoms, index, neighbor_position):
+        dist = ((atoms[index].x - neighbor_position[0])**2 + (atoms[index].y - neighbor_position[1])**2 + (atoms[index].z - neighbor_position[2])**2)**(1/2)
+        return dist
+    def slide(self, atoms, disp, tolerance): # disp is displacement of the grain per step, tolerance is the minimum distance allowed between 2 atoms.
+        disp = disp
+        theta = np.arctan(atoms.get_cell()[1][1]/atoms.get_cell()[2][2])
+        for atom in atoms:
+            if atom.x > 13.8:
+                atom.y = atom.y + disp*np.sin(theta)
+                atom.z = atom.z + disp*np.cos(theta)
+        for atom in atoms:
+            if atom.y < 0:
+                atom.y = atom.y + 7.73277061
+            if atom.y > 7.73277061:
+                atom.y = atom.y - 7.73277061
+            if atom.z < 0:
+                atom.z = atom.z + 13.39355158
+            if atom.z > 13.39355158:
+                atom.z = atom.z - 13.39355158
+        nat_cut = natural_cutoffs(atoms, mult=0.95)
+        nl = NeighborList(nat_cut, self_interaction=False, bothways=True)
+        nl.update(atoms)
+        c = 0
+        close_atoms = 0
+        for atom in atoms:
+            d = np.array([])
+            indices, offsets = nl.get_neighbors(c)
+            for i, offset in zip(indices, offsets):
+                pos = atoms.positions[i] + offset @ atoms.get_cell()    # Code to account for periodic boundary condition. Offset list consists something like [0,1,0] and offset@atoms.get_cell() gives [0,7.73277,0] where 7.73277 is the b vector length.
+                d = np.append(d, self.distance(atoms, c, pos))
+            for i in d:
+                if i < tolerance:
+                    close_atoms = close_atoms + 1
+            c = c + 1
+        if close_atoms == 0:           
+            return atoms
+        else:
+            self.slide(atoms, disp)
+    def analysis(self):
+        E = np.array([])
+        for i in range(80):
+            os.chdir(f"./{i}/")
+            atoms = read("OUTCAR")
+            E = np.append(E, atoms.get_potential_energy())
+            os.chdir("./../")
+        return E
 
 if __name__ == "__main__":
     pass

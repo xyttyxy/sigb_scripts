@@ -604,7 +604,7 @@ class Dimer:
         self.atoms.get_potential_energy()
         
 class gb_sliding:
-    def distance(self, index, neighbor_position):
+    def distance(self, atoms, index, neighbor_position):
         dist = ((atoms[index].x - neighbor_position[0])**2 + (atoms[index].y - neighbor_position[1])**2 + (atoms[index].z - neighbor_position[2])**2)**(1/2)
         return dist
     def slide(self, atoms, disp, tolerance): # disp is displacement of the grain per step, tolerance is the minimum distance allowed between 2 atoms.
@@ -633,7 +633,7 @@ class gb_sliding:
             indices, offsets = nl.get_neighbors(c)
             for i, offset in zip(indices, offsets):
                 pos = atoms.positions[i] + offset @ atoms.get_cell()    # Code to account for periodic boundary condition. Offset list consists something like [0,1,0] and offset@atoms.get_cell() gives [0,7.73277,0] where 7.73277 is the b vector length.
-                d = np.append(d, self.distance(c, pos))
+                d = np.append(d, self.distance(atoms, c, pos))
             for i in d:
                 if i < tolerance:
                     close_atoms = close_atoms + 1
